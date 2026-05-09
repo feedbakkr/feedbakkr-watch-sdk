@@ -44,6 +44,7 @@ export interface EventPayload {
 	timestamp: string;
 	tenantId?: string;
 	projectId: string;
+	projectName?: string;
 
 	errorName?: string;
 	message: string;
@@ -78,4 +79,5 @@ export interface IngestResponse {
 	occurrenceId: string;
 	fingerprint: string;
 	isNewGroup: boolean;
+	wasResolved?: boolean;
 }

@@ -8,6 +8,7 @@ export interface ErrorGroup {
 	id: string;
 	tenantId: string;
 	projectId: string;
+	projectName: string | null;
 	environment: string;
 	source: string;
 	severity: string;
@@ -27,6 +28,7 @@ export interface ErrorOccurrence {
 	groupId: string;
 	tenantId: string;
 	projectId: string;
+	projectName: string | null;
 	occurredAt: string;
 	source: string;
 	severity: string;

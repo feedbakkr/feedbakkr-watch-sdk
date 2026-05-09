@@ -10,6 +10,7 @@ import {
 export interface ClientOptions {
 	endpoint: string;
 	projectId: string;
+	projectName?: string;
 	tenantId?: string;
 	environment: string;
 	appVersion?: string;
@@ -79,6 +80,7 @@ export function createFeedbakkrErrorsClient(options: ClientOptions): FeedbakkrEr
 				error,
 				{
 					projectId: options.projectId,
+					projectName: options.projectName,
 					tenantId: options.tenantId,
 					environment: options.environment,
 					appVersion: options.appVersion,

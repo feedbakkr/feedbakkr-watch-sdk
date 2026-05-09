@@ -153,6 +153,7 @@ export interface ToolApiError {
 export interface WatchProjectStats {
 	tenantId: string;
 	projectId: string;
+	projectName: string | null;
 	environment: string;
 	openCount: number;
 	resolvedCount: number;
@@ -177,6 +178,7 @@ export interface WatchNotificationGroupSummary {
 	id: string;
 	tenantId: string;
 	projectId: string;
+	projectName: string | null;
 	environment: string;
 	source: string;
 	severity: string;

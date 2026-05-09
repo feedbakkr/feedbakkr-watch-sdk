@@ -10,6 +10,7 @@ import {
 export interface InitOptions {
 	endpoint: string;
 	projectId: string;
+	projectName?: string;
 	tenantId?: string;
 	environment: string;
 	appVersion?: string;
@@ -27,11 +28,15 @@ export interface InitOptions {
 
 interface InternalState {
 	options: Required<
-		Omit<InitOptions, "appVersion" | "apiKey" | "tenantId" | "defaultTags" | "beforeSend">
+		Omit<
+			InitOptions,
+			"appVersion" | "apiKey" | "tenantId" | "projectName" | "defaultTags" | "beforeSend"
+		>
 	> & {
 		appVersion?: string;
 		apiKey?: string;
 		tenantId?: string;
+		projectName?: string;
 		defaultTags?: Tags;
 		beforeSend?: InitOptions["beforeSend"];
 	};
@@ -45,6 +50,7 @@ export function initFeedbakkrErrors(options: InitOptions): void {
 	const merged: InternalState["options"] = {
 		endpoint: options.endpoint,
 		projectId: options.projectId,
+		projectName: options.projectName,
 		tenantId: options.tenantId,
 		environment: options.environment,
 		appVersion: options.appVersion,
@@ -135,6 +141,7 @@ function safeCapture(error: Error | string, options: CaptureOptions = {}): void 
 			error,
 			{
 				projectId: state.options.projectId,
+				projectName: state.options.projectName,
 				tenantId: state.options.tenantId,
 				environment: state.options.environment,
 				appVersion: state.options.appVersion,

@@ -3,6 +3,7 @@ import type { CaptureOptions, ErrorSeverity, ErrorSource, EventPayload, Tags } f
 
 export interface PayloadBuilderConfig {
 	projectId: string;
+	projectName?: string;
 	tenantId?: string;
 	environment: string;
 	appVersion?: string;
@@ -28,6 +29,7 @@ export function buildPayload(
 		timestamp: new Date().toISOString(),
 		tenantId: config.tenantId,
 		projectId: config.projectId,
+		projectName: config.projectName,
 		errorName,
 		message,
 		stack,
