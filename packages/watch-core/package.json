@@ -1,0 +1,31 @@
+{
+	"name": "@feedbakkr/watch-core",
+	"version": "0.1.0",
+	"description": "Shared error-monitoring primitives used by watch-web, watch-node, and watch-worker.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsup src/index.ts --format esm --dts --clean",
+		"dev": "tsup src/index.ts --format esm --dts --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"tsup": "^8.3.0",
+		"typescript": "~5.8.0",
+		"vitest": "^3.0.0"
+	}
+}

@@ -1,0 +1,47 @@
+{
+	"name": "@feedbakkr/watch-node",
+	"version": "0.1.0",
+	"description": "Server SDK (Node, Cloudflare Workers, Hono) for capturing errors to a Feedbakkr Watch collector.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./hono": {
+			"types": "./dist/hono.d.ts",
+			"import": "./dist/hono.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsup src/index.ts src/hono.ts --format esm --dts --clean",
+		"dev": "tsup src/index.ts src/hono.ts --format esm --dts --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
+	},
+	"peerDependencies": {
+		"hono": ">=4.0.0"
+	},
+	"peerDependenciesMeta": {
+		"hono": {
+			"optional": true
+		}
+	},
+	"dependencies": {
+		"@feedbakkr/watch-core": "workspace:^"
+	},
+	"devDependencies": {
+		"hono": "^4.7.0",
+		"tsup": "^8.3.0",
+		"typescript": "~5.8.0",
+		"vitest": "^3.0.0"
+	}
+}

@@ -1,0 +1,48 @@
+{
+	"name": "@feedbakkr/watch-web",
+	"version": "0.1.0",
+	"description": "Browser SDK for capturing errors and forwarding them to a Feedbakkr Watch collector.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./react": {
+			"types": "./dist/react.d.ts",
+			"import": "./dist/react.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsup src/index.ts src/react.tsx --format esm --dts --clean",
+		"dev": "tsup src/index.ts src/react.tsx --format esm --dts --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
+	},
+	"peerDependencies": {
+		"react": ">=18.0.0"
+	},
+	"peerDependenciesMeta": {
+		"react": {
+			"optional": true
+		}
+	},
+	"dependencies": {
+		"@feedbakkr/watch-core": "workspace:^"
+	},
+	"devDependencies": {
+		"@types/react": "^19.0.0",
+		"react": "^19.0.0",
+		"tsup": "^8.3.0",
+		"typescript": "~5.8.0",
+		"vitest": "^3.0.0"
+	}
+}
