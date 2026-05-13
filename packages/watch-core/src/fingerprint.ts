@@ -13,6 +13,14 @@ export interface FingerprintInputs {
 	message: string;
 	stack?: string;
 	route?: string;
+	/**
+	 * When true, the (normalised) route is folded into the fingerprint so
+	 * the same error at different URLs becomes distinct groups. Default
+	 * false: an error that fires on every product page rolls up into one
+	 * group, not one per URL. Set by the SDK via the `groupByUrl` init
+	 * option.
+	 */
+	groupByUrl?: boolean;
 }
 
 export function buildFingerprintKey(inputs: FingerprintInputs): string {
@@ -23,7 +31,7 @@ export function buildFingerprintKey(inputs: FingerprintInputs): string {
 		inputs.errorName ?? "",
 		normaliseMessage(inputs.message),
 		topMeaningfulFrame(inputs.stack),
-		normaliseRoute(inputs.route),
+		inputs.groupByUrl ? normaliseRoute(inputs.route) : "",
 	].join("|");
 }
 
@@ -46,6 +54,7 @@ export async function computeFingerprint(payload: EventPayload): Promise<string>
 		message: payload.message,
 		stack: payload.stack,
 		route: payload.request?.route,
+		groupByUrl: payload.groupByUrl,
 	});
 
 	const data = new TextEncoder().encode(key);

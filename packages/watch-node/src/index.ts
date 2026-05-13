@@ -5,6 +5,7 @@ import {
 	type ErrorSource,
 	type EventPayload,
 	type Tags,
+	walkCauses,
 } from "@feedbakkr/watch-core";
 
 export interface ClientOptions {
@@ -20,6 +21,14 @@ export interface ClientOptions {
 	defaultTags?: Tags;
 	defaultSource?: ErrorSource;
 	maxQueueSize?: number;
+	/**
+	 * When true, the worker folds `request.route` into the fingerprint so
+	 * the same error at different routes becomes distinct groups. Caller
+	 * must pass `route` via `CaptureOptions` (or the Hono helper, which
+	 * fills it in automatically) — there's no global `route` to auto-detect
+	 * server-side.
+	 */
+	groupByUrl?: boolean;
 	beforeSend?: (event: EventPayload) => EventPayload | null | Promise<EventPayload | null>;
 	fetchImpl?: typeof fetch;
 }
@@ -89,6 +98,19 @@ export function createFeedbakkrErrorsClient(options: ClientOptions): FeedbakkrEr
 				},
 				captureOpts,
 			);
+
+			// Cause-chain — always on, part of the necessary error data.
+			if (error instanceof Error) {
+				const causes = walkCauses(error);
+				if (causes.length > 0) event.causes = causes;
+			}
+
+			// Group-by-URL instruction for the worker. No-op if the caller
+			// didn't pass a route — there's nothing to fold in.
+			if (options.groupByUrl && event.request?.route) {
+				event.groupByUrl = true;
+			}
+
 			queue.enqueue(event);
 		} catch {
 			// SDKs must never throw into host code.

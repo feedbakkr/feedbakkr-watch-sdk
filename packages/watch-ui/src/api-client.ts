@@ -21,6 +21,24 @@ export interface ErrorGroup {
 	affectedUsersCount: number;
 	affectedSessionsCount: number;
 	lastOccurrenceId: string | null;
+	commentCount: number;
+}
+
+export interface ErrorGroupComment {
+	id: string;
+	groupId: string;
+	authorName: string;
+	message: string;
+	createdAt: string;
+}
+
+export interface ListGroupCommentsResponse {
+	data: ErrorGroupComment[];
+}
+
+export interface AddGroupCommentParams {
+	authorName: string;
+	message: string;
 }
 
 export interface ErrorOccurrence {
@@ -93,6 +111,9 @@ export interface ToolApiClient {
 	ignoreGroup(groupId: string): Promise<ErrorGroup>;
 	reopenGroup(groupId: string): Promise<ErrorGroup>;
 	deleteGroup(groupId: string): Promise<{ ok: true }>;
+	listComments(groupId: string): Promise<ListGroupCommentsResponse>;
+	addComment(groupId: string, params: AddGroupCommentParams): Promise<ErrorGroupComment>;
+	deleteComment(commentId: string): Promise<{ ok: true }>;
 	getOverview(params: {
 		tenantId?: string;
 		projectId?: string;
@@ -176,6 +197,18 @@ export function createBrowserApiClient(options: CreateBrowserApiClientOptions): 
 		},
 		deleteGroup(groupId) {
 			return call(`/v1/groups/${encodeURIComponent(groupId)}`, { method: "DELETE" });
+		},
+		listComments(groupId) {
+			return call(`/v1/groups/${encodeURIComponent(groupId)}/comments`);
+		},
+		addComment(groupId, params) {
+			return call(`/v1/groups/${encodeURIComponent(groupId)}/comments`, {
+				method: "POST",
+				body: JSON.stringify(params),
+			});
+		},
+		deleteComment(commentId) {
+			return call(`/v1/comments/${encodeURIComponent(commentId)}`, { method: "DELETE" });
 		},
 		getOverview(params) {
 			return call(`/v1/reports/overview${qs(params as Record<string, unknown>)}`);

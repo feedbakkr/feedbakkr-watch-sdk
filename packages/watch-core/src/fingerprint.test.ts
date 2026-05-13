@@ -38,17 +38,35 @@ describe("computeFingerprint", () => {
 		expect(fp).toBe("custom-fp-123");
 	});
 
-	test("dynamic ids in route do not split the group", async () => {
+	test("dynamic ids in route do not split the group when grouping by URL", async () => {
 		const a = await computeFingerprint(
 			payload({
+				groupByUrl: true,
 				request: { route: "/projects/550e8400-e29b-41d4-a716-446655440000/edit" },
 			}),
 		);
 		const b = await computeFingerprint(
 			payload({
+				groupByUrl: true,
 				request: { route: "/projects/11111111-2222-3333-4444-555555555555/edit" },
 			}),
 		);
 		expect(a).toBe(b);
+	});
+
+	test("route is ignored by default — same error at different URLs groups together", async () => {
+		const a = await computeFingerprint(payload({ request: { route: "/page-a" } }));
+		const b = await computeFingerprint(payload({ request: { route: "/page-b" } }));
+		expect(a).toBe(b);
+	});
+
+	test("with groupByUrl on, different routes split the group", async () => {
+		const a = await computeFingerprint(
+			payload({ groupByUrl: true, request: { route: "/page-a" } }),
+		);
+		const b = await computeFingerprint(
+			payload({ groupByUrl: true, request: { route: "/page-b" } }),
+		);
+		expect(a).not.toBe(b);
 	});
 });

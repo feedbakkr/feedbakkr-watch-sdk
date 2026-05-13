@@ -1,9 +1,12 @@
 export type {
+	AddGroupCommentParams,
 	CreateBrowserApiClientOptions,
 	ErrorGroup,
+	ErrorGroupComment,
 	ErrorGroupStatus,
 	ErrorOccurrence,
 	ErrorOverview,
+	ListGroupCommentsResponse,
 	ListGroupsParams,
 	ProjectStats,
 	ProjectStatsResponse,
