@@ -1,6 +1,6 @@
 {
 	"name": "@feedbakkr/watch-core",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Shared error-monitoring primitives used by watch-web, watch-node, and watch-worker.",
 	"license": "MIT",
 	"type": "module",
