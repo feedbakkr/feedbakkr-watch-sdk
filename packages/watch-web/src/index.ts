@@ -86,6 +86,16 @@ interface InternalState {
 
 let state: InternalState | null = null;
 
+// Module-level guards so re-init (Vite HMR rerunning the app entry, or a
+// host that calls initFeedbakkrErrors more than once) doesn't stack
+// listeners forever. Without these guards every save during dev would add
+// another fetch wrapper / click listener / unhandled-error handler — they
+// leak memory and the host process eventually gets SIGTERMed.
+let windowListenersInstalled = false;
+let fetchPatched = false;
+let historyPatched = false;
+let clicksHooked = false;
+
 export function initFeedbakkrErrors(options: InitOptions): void {
 	const merged: InternalState["options"] = {
 		endpoint: options.endpoint,
@@ -121,15 +131,19 @@ export function initFeedbakkrErrors(options: InitOptions): void {
 
 	if (typeof window === "undefined") return;
 
-	if (merged.captureUnhandledErrors) {
+	// Each window-level listener is installed exactly once per page. The
+	// handler closes over `state` (a module-level binding) so any subsequent
+	// init that swaps `state` is picked up automatically — no need to
+	// re-attach a fresh handler with a new closure.
+	if (!windowListenersInstalled) {
+		windowListenersInstalled = true;
 		window.addEventListener("error", (e) => {
+			if (!state?.options.captureUnhandledErrors) return;
 			const err = e.error instanceof Error ? e.error : new Error(e.message || "Unhandled error");
 			safeCapture(err);
 		});
-	}
-
-	if (merged.captureUnhandledRejections) {
 		window.addEventListener("unhandledrejection", (e) => {
+			if (!state?.options.captureUnhandledRejections) return;
 			const reason = e.reason;
 			const err =
 				reason instanceof Error
@@ -380,6 +394,8 @@ function scrubUrl(value: string): string {
 }
 
 function hookHistory(): void {
+	if (historyPatched) return;
+	historyPatched = true;
 	const original = {
 		pushState: history.pushState.bind(history),
 		replaceState: history.replaceState.bind(history),
@@ -415,7 +431,9 @@ function recordNavigation(url: string | URL | null | undefined): void {
  * (aria-label > textContent > input name) — no values, no PII fields.
  */
 function hookClicks(): void {
+	if (clicksHooked) return;
 	if (typeof document === "undefined") return;
+	clicksHooked = true;
 	document.addEventListener(
 		"click",
 		(e) => {
@@ -469,7 +487,9 @@ function truncate(s: string, max: number): string {
  * query + hash so credentials in URLs don't leak into the payload.
  */
 function hookFetch(): void {
+	if (fetchPatched) return;
 	if (typeof globalThis.fetch !== "function") return;
+	fetchPatched = true;
 	const original = globalThis.fetch.bind(globalThis);
 	globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 		const startedAt = Date.now();
@@ -525,6 +545,10 @@ function debug(...args: unknown[]): void {
 // Exported for tests so they can clear module state between specs.
 export function __resetForTests(): void {
 	state = null;
+	windowListenersInstalled = false;
+	fetchPatched = false;
+	historyPatched = false;
+	clicksHooked = false;
 }
 
 // Re-export the cause-chain type so consumers don't have to dual-import
