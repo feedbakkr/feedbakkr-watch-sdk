@@ -97,6 +97,26 @@ let historyPatched = false;
 let clicksHooked = false;
 
 export function initFeedbakkrErrors(options: InitOptions): void {
+	// Endpoint scheme guard. The endpoint is whatever the host passes — a
+	// misconfigured staging bundle hard-coded to `http://malicious.example`
+	// would silently exfiltrate every captured event (URLs, user agents,
+	// breadcrumbs) over plaintext. Reject anything that isn't `https://`
+	// unless the caller explicitly opted into `debug: true` (local dev).
+	if (typeof options.endpoint === "string" && options.endpoint.length > 0) {
+		try {
+			const url = new URL(options.endpoint);
+			if (url.protocol !== "https:" && !options.debug) {
+				console.warn(
+					"[feedbakkr-watch] endpoint is not https — refusing to initialise. Set debug:true to bypass for local development.",
+				);
+				return;
+			}
+		} catch {
+			console.warn("[feedbakkr-watch] endpoint is not a valid URL — refusing to initialise.");
+			return;
+		}
+	}
+
 	const merged: InternalState["options"] = {
 		endpoint: options.endpoint,
 		projectId: options.projectId,
