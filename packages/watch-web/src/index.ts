@@ -11,8 +11,8 @@ import {
 	type LastUserAction,
 	mergeConsent,
 	type Tags,
-	walkCauses,
 	type WebContext,
+	walkCauses,
 } from "@feedbakkr/watch-core";
 
 export interface InitOptions {
@@ -513,7 +513,9 @@ function hookFetch(): void {
 	const original = globalThis.fetch.bind(globalThis);
 	globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 		const startedAt = Date.now();
-		const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+		const method = (
+			init?.method ?? (input instanceof Request ? input.method : "GET")
+		).toUpperCase();
 		const rawUrl =
 			typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 		const url = scrubUrl(rawUrl);
