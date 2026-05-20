@@ -1,6 +1,6 @@
 {
 	"name": "@feedbakkr/watch-ui",
-	"version": "0.2.0",
+	"version": "0.2.2",
 	"description": "React components for browsing and acting on errors collected by a Feedbakkr Watch worker.",
 	"license": "MIT",
 	"type": "module",
