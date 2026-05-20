@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+.wrangler
+.turbo
+.DS_Store
+*.log
+coverage
+.vitest
+.env
+.env.local
+.dev.vars
