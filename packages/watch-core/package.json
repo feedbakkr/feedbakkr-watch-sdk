@@ -3,6 +3,13 @@
 	"version": "0.2.3",
 	"description": "Shared error-monitoring primitives used by watch-web, watch-node, and watch-worker.",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/feedbakkr/feedbakkr-watch-sdk.git",
+		"directory": "packages/watch-core"
+	},
+	"homepage": "https://github.com/feedbakkr/feedbakkr-watch-sdk/tree/main/packages/watch-core#readme",
+	"bugs": "https://github.com/feedbakkr/feedbakkr-watch-sdk/issues",
 	"type": "module",
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",

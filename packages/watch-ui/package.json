@@ -3,6 +3,13 @@
 	"version": "0.2.3",
 	"description": "React components for browsing and acting on errors collected by a Feedbakkr Watch worker.",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/feedbakkr/feedbakkr-watch-sdk.git",
+		"directory": "packages/watch-ui"
+	},
+	"homepage": "https://github.com/feedbakkr/feedbakkr-watch-sdk/tree/main/packages/watch-ui#readme",
+	"bugs": "https://github.com/feedbakkr/feedbakkr-watch-sdk/issues",
 	"type": "module",
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",
