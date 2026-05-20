@@ -3,6 +3,13 @@
 	"version": "0.2.3",
 	"description": "Server SDK (Node, Cloudflare Workers, Hono) for capturing errors to a Feedbakkr Watch collector.",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/feedbakkr/feedbakkr-watch-sdk.git",
+		"directory": "packages/watch-node"
+	},
+	"homepage": "https://github.com/feedbakkr/feedbakkr-watch-sdk/tree/main/packages/watch-node#readme",
+	"bugs": "https://github.com/feedbakkr/feedbakkr-watch-sdk/issues",
 	"type": "module",
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",

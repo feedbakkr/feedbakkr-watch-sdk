@@ -3,6 +3,13 @@
 	"version": "0.2.3",
 	"description": "Shared types for the Feedbakkr Watch tool contract (manifest, connection, report shapes, project stats, notifications).",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/feedbakkr/feedbakkr-watch-sdk.git",
+		"directory": "packages/watch-types"
+	},
+	"homepage": "https://github.com/feedbakkr/feedbakkr-watch-sdk/tree/main/packages/watch-types#readme",
+	"bugs": "https://github.com/feedbakkr/feedbakkr-watch-sdk/issues",
 	"type": "module",
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",
