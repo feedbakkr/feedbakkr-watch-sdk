@@ -1,6 +1,6 @@
 {
 	"name": "@feedbakkr/watch-web",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"description": "Browser SDK for capturing errors and forwarding them to a Feedbakkr Watch collector.",
 	"license": "MIT",
 	"type": "module",

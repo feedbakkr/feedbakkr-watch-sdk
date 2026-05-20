@@ -1,6 +1,6 @@
 {
 	"name": "@feedbakkr/watch-node",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"description": "Server SDK (Node, Cloudflare Workers, Hono) for capturing errors to a Feedbakkr Watch collector.",
 	"license": "MIT",
 	"type": "module",
