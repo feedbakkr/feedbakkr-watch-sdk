@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from `packageManager` field in root package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Workspace packages cross-import each other via their built `dist/`,
+      # so the root `verify` script must run in this order:
+      #   biome check → build → typecheck → test
+      # Calling `pnpm verify` here keeps CI and local in sync.
+      - name: Verify
+        run: pnpm verify

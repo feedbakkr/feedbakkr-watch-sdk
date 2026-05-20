@@ -1,0 +1,104 @@
+name: Publish packages
+
+# Manual release trigger. Bump versions in each package's package.json before
+# running.
+#
+# Auth: npm trusted publishing (OIDC). The publish steps below do NOT set
+# `NODE_AUTH_TOKEN` — npm 11.5+ on Node 24 exchanges a GitHub Actions OIDC
+# ID token for a short-lived npm publish token via the trusted-publisher
+# config registered at
+#   https://www.npmjs.com/package/<name>/access
+# No NPM_TOKEN secret is required.
+#
+# Requirements:
+#  - `permissions: id-token: write` on the job (set below)
+#  - Node 24 on the runner (ships npm 11.x; Node 22's bundled npm 10 lacks
+#    the OIDC client)
+#  - No `registry-url:` on actions/setup-node — that writes an .npmrc with
+#    `_authToken=${NODE_AUTH_TOKEN}` which forces npm down the token-auth
+#    path before it considers OIDC
+#  - `--provenance` flag on each publish; npm verifies the provenance bundle
+#    against this repo's public source via the sigstore transparency log
+#  - This repo must be public (npm rejects provenance attestations from
+#    private sources)
+#  - A trusted-publisher entry per package on npmjs.com pointing at
+#    `feedbakkr/feedbakkr-watch-sdk` + `publish-packages.yml`
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "npm dist-tag (e.g. latest, next)"
+        required: true
+        default: "latest"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm OIDC trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from `packageManager` field in root package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Pre-publish gate. Build runs before typecheck because workspace
+      # packages cross-import each other via their built `dist/`. The audit
+      # blocks on high+ advisories.
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Audit (high+)
+        run: pnpm audit --audit-level high
+
+      # Preview pack contents so the workflow log records exactly which
+      # files would ship — last-line defence against shipping a stray
+      # credential or build artefact. `npm pack --dry-run` reads each
+      # package's `files` field; works without workspace context.
+      - name: Preview pack contents (every publishable package)
+        run: |
+          for pkg in packages/watch-types packages/watch-core packages/watch-web packages/watch-node packages/watch-ui; do
+            echo "--- $pkg ---"
+            (cd "$pkg" && npm pack --dry-run)
+          done
+
+      # Publish each package using `npm publish` (not `pnpm publish`) so the
+      # OIDC handshake fires through npm's native trusted-publisher flow.
+      # `--access public` is required for first-time publishes of scoped
+      # packages. `--provenance` triggers the OIDC exchange + sigstore
+      # attestation. No `env: NODE_AUTH_TOKEN` — OIDC handles auth.
+      - name: Publish @feedbakkr/watch-types
+        working-directory: packages/watch-types
+        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
+
+      - name: Publish @feedbakkr/watch-core
+        working-directory: packages/watch-core
+        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
+
+      - name: Publish @feedbakkr/watch-web
+        working-directory: packages/watch-web
+        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
+
+      - name: Publish @feedbakkr/watch-node
+        working-directory: packages/watch-node
+        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
+
+      - name: Publish @feedbakkr/watch-ui
+        working-directory: packages/watch-ui
+        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
