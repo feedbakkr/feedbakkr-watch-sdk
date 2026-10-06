@@ -21,13 +21,13 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.5",
 		"tsup": "^8.3.0",
-		"typescript": "~5.8.0",
+		"typescript": "~5.9.0",
 		"vitest": "^3.0.0"
 	},
 	"engines": {
 		"node": ">=22"
 	},
-	"packageManager": "pnpm@10.33.4",
+	"packageManager": "pnpm@10.34.6",
 	"pnpm": {
 		"onlyBuiltDependencies": [
 			"@biomejs/biome",
