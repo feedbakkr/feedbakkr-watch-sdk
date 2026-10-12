@@ -26,9 +26,13 @@ const errors = createFeedbakkrErrorsClient({
 try {
 	await doThing();
 } catch (e) {
-	await errors.captureError(e, { source: "api", route: "/widgets" });
+	// Fire and forget: don't await in the request path.
+	void errors.captureError(e, { source: "api", route: "/widgets" });
 	throw e;
 }
+
+// Before a short-lived process exits:
+await errors.flush();
 ```
 
 ## Hono / Cloudflare Workers
@@ -55,6 +59,14 @@ app.onError(
 `honoOnError` reads `c.executionCtx.waitUntil` when available, so on
 Workers the capture survives past the response without delaying it.
 
+Capturing from your own handler on Workers works the same way.
+`captureError` returns a promise that settles when the event has been sent,
+and it never rejects. Pass it to `waitUntil` rather than awaiting it:
+
+```ts
+c.executionCtx.waitUntil(errors.captureError(err, { route: c.req.path }));
+```
+
 ## Options
 
 | Option | Default | What it does |
@@ -63,8 +75,9 @@ Workers the capture survives past the response without delaying it.
 | `projectId` | — | Stable per-project identifier. |
 | `environment` | — | e.g. `production`, `dev`. |
 | `apiKey` | — | Sent as `x-feedbakkr-tool-key`. |
-| `enabled` | `true` | Set false in tests. |
-| `defaultSource` | `"api"` | Override per call if needed. |
+| `enabled` | `true` | Set false in tests. Reporting is also off when `endpoint` or `projectId` is empty. |
+| `defaultSource` | `"api"` | Component name, any string (for example `api-cron`). Override per call if needed. |
+| `timeoutMs` | `5000` | Abandon a send after this long. |
 | `defaultTags` | — | Tags merged into every event. |
 | `maxQueueSize` | `64` | Backpressure cap; excess events drop silently. |
 | `beforeSend` | — | Drop or mutate before send. |
@@ -78,8 +91,9 @@ The SDK never reads request bodies, cookies, or auth headers on its own.
 
 ## Fail-safe
 
-`captureError` never throws into your route handler. The async queue
-swallows transport errors so a flapping collector can't take down your API.
+`captureError` never throws into your route handler, and its promise never
+rejects. Network failures, error responses and timeouts are swallowed, so a
+flapping collector can't take down your API. There are no retries.
 
 ## See also
 

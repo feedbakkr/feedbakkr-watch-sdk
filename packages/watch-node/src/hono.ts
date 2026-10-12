@@ -1,10 +1,10 @@
-import type { CaptureOptions, ErrorSource } from "@feedbakkr/watch-core";
+import type { CaptureOptions, SourceName } from "@feedbakkr/watch-core";
 import type { Context, MiddlewareHandler } from "hono";
 import type { FeedbakkrErrorsClient } from "./index.js";
 
 export interface HonoErrorsOptions {
 	client: FeedbakkrErrorsClient;
-	source?: ErrorSource;
+	source?: SourceName;
 	requestIdHeader?: string;
 }
 
@@ -50,7 +50,12 @@ export function honoOnError(options: HonoErrorsOptions) {
 export function ensureRequestId(headerName = "x-request-id"): MiddlewareHandler {
 	return async (c, next) => {
 		if (!c.req.header(headerName)) {
-			c.req.raw.headers.set(headerName, crypto.randomUUID());
+			try {
+				c.req.raw.headers.set(headerName, crypto.randomUUID());
+			} catch {
+				// Request headers are immutable on some runtimes (Cloudflare
+				// Workers). Skip rather than fail the host's request.
+			}
 		}
 		await next();
 	};

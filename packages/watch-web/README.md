@@ -66,8 +66,10 @@ Or use the HOC: `withErrorBoundary(Component, { fallback })`.
 | `environment` | — | `production`, `staging`, etc. |
 | `appVersion` | — | Recommended; correlates errors to releases. |
 | `apiKey` | — | Sent as `x-feedbakkr-tool-key`. |
-| `enabled` | `true` | Set false in tests. |
+| `enabled` | `true` | Set false to turn reporting off entirely (no listeners, no requests). Reporting is also off when `endpoint` or `projectId` is empty. |
 | `debug` | `false` | Logs internal failures via `console.debug`. |
+| `defaultSource` | `"web"` | Component name for events that don't set one, any string (for example `community-web`). |
+| `timeoutMs` | `5000` | Abandon a send after this long. |
 | `maxBreadcrumbs` | `30` | Cap on retained breadcrumbs. |
 | `sampleRate` | `1` | 0–1 fraction sent. |
 | `captureUnhandledErrors` | `true` | `window.error` listener. |

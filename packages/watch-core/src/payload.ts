@@ -1,5 +1,5 @@
 import { sanitise } from "./sanitise.js";
-import type { CaptureOptions, ErrorSeverity, ErrorSource, EventPayload, Tags } from "./types.js";
+import type { CaptureOptions, ErrorSeverity, EventPayload, SourceName, Tags } from "./types.js";
 
 export interface PayloadBuilderConfig {
 	projectId: string;
@@ -7,7 +7,7 @@ export interface PayloadBuilderConfig {
 	tenantId?: string;
 	environment: string;
 	appVersion?: string;
-	defaultSource: ErrorSource;
+	defaultSource: SourceName;
 	defaultTags?: Tags;
 }
 
