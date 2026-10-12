@@ -16,6 +16,8 @@
 		"allowSyntheticDefaultImports": true,
 		"declaration": true,
 		"declarationMap": true,
-		"sourceMap": true
+		"sourceMap": true,
+		// tsup's DTS build injects `baseUrl`, which TypeScript 6 deprecates.
+		"ignoreDeprecations": "6.0"
 	}
 }

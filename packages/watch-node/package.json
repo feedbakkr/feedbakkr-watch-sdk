@@ -46,9 +46,9 @@
 		"@feedbakkr/watch-core": "workspace:^"
 	},
 	"devDependencies": {
-		"hono": "^4.7.0",
-		"tsup": "^8.3.0",
-		"typescript": "~5.8.0",
-		"vitest": "^3.0.0"
+		"hono": "^4.13.13",
+		"tsup": "^8.5.1",
+		"typescript": "~6.0.3",
+		"vitest": "^4.1.11"
 	}
 }
