@@ -6,7 +6,7 @@ export { buildFingerprintKey, computeFingerprint } from "./fingerprint.js";
 export { normaliseMessage, normaliseRoute, topMeaningfulFrame } from "./normalise.js";
 export { buildPayload, severityForCapture } from "./payload.js";
 export type { AsyncQueueOptions } from "./queue.js";
-export { AsyncQueue } from "./queue.js";
+export { AsyncQueue, timeoutSignal } from "./queue.js";
 export type { SanitiseOptions } from "./sanitise.js";
 export { safeJsonStringify, sanitise } from "./sanitise.js";
 export type {
@@ -21,6 +21,7 @@ export type {
 	LastUserAction,
 	RequestContext,
 	RuntimeContext,
+	SourceName,
 	Tags,
 	UserContext,
 	WebContext,

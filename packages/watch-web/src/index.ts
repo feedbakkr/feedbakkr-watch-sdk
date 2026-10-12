@@ -10,7 +10,9 @@ import {
 	type FetchHistoryEntry,
 	type LastUserAction,
 	mergeConsent,
+	type SourceName,
 	type Tags,
+	timeoutSignal,
 	type WebContext,
 	walkCauses,
 } from "@feedbakkr/watch-core";
@@ -23,8 +25,17 @@ export interface InitOptions {
 	environment: string;
 	appVersion?: string;
 	apiKey?: string;
+	/**
+	 * Set false to turn reporting off entirely: no listeners, no requests.
+	 * Reporting is also off when `endpoint` or `projectId` is empty, so a
+	 * missing config never produces requests.
+	 */
 	enabled?: boolean;
 	debug?: boolean;
+	/** Source (component) for events that don't set one. Default "web". */
+	defaultSource?: SourceName;
+	/** Abort a send after this many milliseconds. Default 5000. */
+	timeoutMs?: number;
 	maxBreadcrumbs?: number;
 	sampleRate?: number;
 	defaultTags?: Tags;
@@ -97,6 +108,13 @@ let historyPatched = false;
 let clicksHooked = false;
 
 export function initFeedbakkrErrors(options: InitOptions): void {
+	// Missing config or `enabled: false` turns reporting off quietly. Clearing
+	// `state` also silences listeners left installed by an earlier init.
+	if (!options.endpoint || !options.projectId || options.enabled === false) {
+		state = null;
+		return;
+	}
+
 	// Endpoint scheme guard. The endpoint is whatever the host passes — a
 	// misconfigured staging bundle hard-coded to `http://malicious.example`
 	// would silently exfiltrate every captured event (URLs, user agents,
@@ -127,6 +145,8 @@ export function initFeedbakkrErrors(options: InitOptions): void {
 		apiKey: options.apiKey,
 		enabled: options.enabled ?? true,
 		debug: options.debug ?? false,
+		defaultSource: options.defaultSource ?? "web",
+		timeoutMs: options.timeoutMs ?? 5000,
 		maxBreadcrumbs: options.maxBreadcrumbs ?? 30,
 		sampleRate: options.sampleRate ?? 1,
 		captureUnhandledErrors: options.captureUnhandledErrors ?? true,
@@ -251,7 +271,7 @@ function safeCapture(error: Error | string, options: CaptureOptions = {}): void 
 				tenantId: state.options.tenantId,
 				environment: state.options.environment,
 				appVersion: state.options.appVersion,
-				defaultSource: "web",
+				defaultSource: state.options.defaultSource,
 				defaultTags: state.options.defaultTags,
 			},
 			captureOptions,
@@ -312,6 +332,7 @@ async function sendEvent(event: EventPayload, options: InternalState["options"])
 			headers,
 			body: JSON.stringify(outgoing),
 			keepalive: true,
+			signal: timeoutSignal(options.timeoutMs),
 		});
 	} catch (e) {
 		debug("send failed", e);
@@ -575,4 +596,11 @@ export function __resetForTests(): void {
 
 // Re-export the cause-chain type so consumers don't have to dual-import
 // from watch-core just to type a beforeSend hook.
-export type { CauseChainEntry, ConsentSettings, FetchHistoryEntry, LastUserAction, WebContext };
+export type {
+	CauseChainEntry,
+	ConsentSettings,
+	FetchHistoryEntry,
+	LastUserAction,
+	SourceName,
+	WebContext,
+};

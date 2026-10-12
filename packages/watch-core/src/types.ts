@@ -4,6 +4,13 @@ export type ErrorSeverity = (typeof ERROR_SEVERITIES)[number];
 export const ERROR_SOURCES = ["web", "api", "worker", "mobile", "cli", "other"] as const;
 export type ErrorSource = (typeof ERROR_SOURCES)[number];
 
+/**
+ * The component an event came from. Any string is accepted, so apps can use
+ * their own names (for example `community-web` or `api-cron`); the
+ * `ErrorSource` values remain the common defaults.
+ */
+export type SourceName = ErrorSource | (string & {});
+
 export interface Breadcrumb {
 	timestamp: string;
 	category: string;
@@ -94,7 +101,7 @@ export interface CauseChainEntry {
 }
 
 export interface EventPayload {
-	source: ErrorSource;
+	source: SourceName;
 	severity: ErrorSeverity;
 	environment: string;
 	appVersion?: string;
@@ -139,7 +146,7 @@ export interface CaptureOptions {
 	tags?: Tags;
 	context?: Record<string, unknown>;
 	fingerprint?: string;
-	source?: ErrorSource;
+	source?: SourceName;
 	route?: string;
 	method?: string;
 	statusCode?: number;
