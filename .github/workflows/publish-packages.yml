@@ -67,38 +67,37 @@ jobs:
       - name: Audit (high+)
         run: pnpm audit --audit-level high
 
-      # Preview pack contents so the workflow log records exactly which
-      # files would ship — last-line defence against shipping a stray
-      # credential or build artefact. `npm pack --dry-run` reads each
-      # package's `files` field; works without workspace context.
-      - name: Preview pack contents (every publishable package)
+      # Pack every package with pnpm. `pnpm pack` rewrites the `workspace:^`
+      # dependency specifiers to real version ranges; `npm publish` run in a
+      # package directory does not, which shipped 0.2.3 of watch-web,
+      # watch-node and watch-ui with uninstallable `workspace:^` deps.
+      # The step fails if any `workspace:` specifier survives, and logs each
+      # tarball's file list as a last-line defence against shipping a stray
+      # credential or build artefact.
+      - name: Pack packages
         run: |
-          for pkg in packages/watch-types packages/watch-core packages/watch-web packages/watch-node packages/watch-ui; do
-            echo "--- $pkg ---"
-            (cd "$pkg" && npm pack --dry-run)
+          mkdir -p "$RUNNER_TEMP/packs"
+          for pkg in watch-types watch-core watch-web watch-node watch-ui; do
+            (cd "packages/$pkg" && pnpm pack --pack-destination "$RUNNER_TEMP/packs")
+          done
+          for tgz in "$RUNNER_TEMP"/packs/*.tgz; do
+            echo "--- $(basename "$tgz") ---"
+            tar -tzf "$tgz"
+            if tar -xzOf "$tgz" package/package.json | grep -q '"workspace:'; then
+              echo "::error::$(basename "$tgz") still contains a workspace: dependency"
+              exit 1
+            fi
           done
 
-      # Publish each package using `npm publish` (not `pnpm publish`) so the
-      # OIDC handshake fires through npm's native trusted-publisher flow.
-      # `--access public` is required for first-time publishes of scoped
-      # packages. `--provenance` triggers the OIDC exchange + sigstore
+      # Publish the packed tarballs with `npm publish` (not `pnpm publish`)
+      # so the OIDC handshake fires through npm's native trusted-publisher
+      # flow. `--access public` is required for first-time publishes of
+      # scoped packages. `--provenance` triggers the OIDC exchange + sigstore
       # attestation. No `env: NODE_AUTH_TOKEN` — OIDC handles auth.
-      - name: Publish @feedbakkr/watch-types
-        working-directory: packages/watch-types
-        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
-
-      - name: Publish @feedbakkr/watch-core
-        working-directory: packages/watch-core
-        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
-
-      - name: Publish @feedbakkr/watch-web
-        working-directory: packages/watch-web
-        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
-
-      - name: Publish @feedbakkr/watch-node
-        working-directory: packages/watch-node
-        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
-
-      - name: Publish @feedbakkr/watch-ui
-        working-directory: packages/watch-ui
-        run: npm publish --access public --provenance --tag ${{ github.event.inputs.tag }}
+      # Dependencies first: types, core, then the packages that use them.
+      - name: Publish packages
+        run: |
+          for pkg in watch-types watch-core watch-web watch-node watch-ui; do
+            npm publish "$RUNNER_TEMP"/packs/feedbakkr-$pkg-*.tgz \
+              --access public --provenance --tag ${{ github.event.inputs.tag }}
+          done

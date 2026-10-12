@@ -41,8 +41,10 @@ pnpm verify          # lint + build + typecheck + test
 
 ## Publishing
 
-Releases go out via the `Publish packages` workflow on push to `main` (with a
-version bump) or manual dispatch. All publishes use **OIDC trusted publishing**
+Releases go out via the `Publish packages` workflow, run by manual dispatch
+after the versions are bumped. Packages are packed with `pnpm pack` (which
+rewrites `workspace:` dependencies) and published with `npm publish`. All
+publishes use **OIDC trusted publishing**
 — there's no `NPM_TOKEN` secret. Provenance attestations tie each tarball
 back to the GitHub Actions run that produced it.
 
