@@ -20,14 +20,14 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.15",
-		"tsup": "^8.5.1",
-		"typescript": "~6.0.3",
-		"vitest": "^4.1.11"
+		"tsup": "^9.0.0",
+		"typescript": "~7.0.0",
+		"vitest": "^5.0.0"
 	},
 	"engines": {
 		"node": ">=22"
 	},
-	"packageManager": "pnpm@10.34.6",
+	"packageManager": "pnpm@12.16.1",
 	"pnpm": {
 		"onlyBuiltDependencies": [
 			"@biomejs/biome",
