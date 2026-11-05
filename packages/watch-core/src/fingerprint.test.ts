@@ -33,9 +33,15 @@ describe("computeFingerprint", () => {
 		expect(a).not.toBe(b);
 	});
 
-	test("explicit fingerprint wins", async () => {
-		const fp = await computeFingerprint(payload({ fingerprint: "custom-fp-123" }));
-		expect(fp).toBe("custom-fp-123");
+	test("an explicit fingerprint wins, and long ones with the same start stay apart", async () => {
+		const a = await computeFingerprint(payload({ fingerprint: "checkout-payment-failed" }));
+		const again = await computeFingerprint(
+			payload({ fingerprint: "checkout-payment-failed", message: "Something else" }),
+		);
+		const b = await computeFingerprint(payload({ fingerprint: "checkout-payment-timeout" }));
+		expect(a).toMatch(/^[0-9a-f]{16}$/);
+		expect(again).toBe(a);
+		expect(b).not.toBe(a);
 	});
 
 	test("dynamic ids in route do not split the group when grouping by URL", async () => {

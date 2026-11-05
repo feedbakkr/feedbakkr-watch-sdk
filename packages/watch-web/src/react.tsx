@@ -1,7 +1,7 @@
 import { Component, type ComponentType, type ReactNode } from "react";
 import { captureError } from "./index.js";
 
-interface ErrorBoundaryProps {
+export interface WatchErrorBoundaryProps {
 	children: ReactNode;
 	fallback?: ReactNode | ((error: Error, reset: () => void) => ReactNode);
 	onError?: (error: Error, info: { componentStack?: string }) => void;
@@ -11,7 +11,7 @@ interface ErrorBoundaryState {
 	error: Error | null;
 }
 
-export class FeedbakkrErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class WatchErrorBoundary extends Component<WatchErrorBoundaryProps, ErrorBoundaryState> {
 	override state: ErrorBoundaryState = { error: null };
 
 	static getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -38,15 +38,15 @@ export class FeedbakkrErrorBoundary extends Component<ErrorBoundaryProps, ErrorB
 	}
 }
 
-export function withErrorBoundary<P extends object>(
+export function withWatchErrorBoundary<P extends object>(
 	Component: ComponentType<P>,
-	boundaryProps: Omit<ErrorBoundaryProps, "children"> = {},
+	boundaryProps: Omit<WatchErrorBoundaryProps, "children"> = {},
 ): ComponentType<P> {
 	const Wrapped = (props: P) => (
-		<FeedbakkrErrorBoundary {...boundaryProps}>
+		<WatchErrorBoundary {...boundaryProps}>
 			<Component {...props} />
-		</FeedbakkrErrorBoundary>
+		</WatchErrorBoundary>
 	);
-	Wrapped.displayName = `withErrorBoundary(${Component.displayName ?? Component.name ?? "Anonymous"})`;
+	Wrapped.displayName = `withWatchErrorBoundary(${Component.displayName ?? Component.name ?? "Anonymous"})`;
 	return Wrapped;
 }

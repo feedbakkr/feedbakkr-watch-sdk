@@ -1,62 +1,63 @@
 import type { CaptureOptions, SourceName } from "@feedbakkr/watch-core";
-import type { Context, MiddlewareHandler } from "hono";
-import type { FeedbakkrErrorsClient } from "./index.js";
+import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
+import type { WatchClient } from "./index.js";
 
-export interface HonoErrorsOptions {
-	client: FeedbakkrErrorsClient;
+export interface WatchOnErrorOptions {
+	/**
+	 * The client, or a function that returns it for a request. On Cloudflare
+	 * Workers, where settings live on `c.env`, use a function with
+	 * `getWatchClient` so one client is shared across requests.
+	 */
+	client: WatchClient | ((c: Context) => WatchClient);
+	/** The component to report. Default `api`. */
 	source?: SourceName;
+	/** Read the request id from this header. Default `x-request-id`. */
 	requestIdHeader?: string;
 }
 
 /**
- * Wires a Feedbakkr Errors client into a Hono app via `app.onError`.
+ * An `app.onError` handler that reports server errors to Watch.
  *
- *   const errors = createFeedbakkrErrorsClient({ ... });
- *   app.onError(honoOnError({ client: errors }));
+ *   app.onError(watchOnError({ client: watch }));
  *
- * The capture is enqueued, not awaited, so it never blocks the response. On
- * Cloudflare Workers, the helper also schedules the send via
- * `executionCtx.waitUntil` when available.
+ * `HTTPException`s keep their own response; only those with a 5xx status are
+ * reported, so a 404 or 401 you throw on purpose isn't an error in Watch.
+ * Anything else is reported and answered with a plain 500. The send never
+ * delays the response: on Workers it's passed to `executionCtx.waitUntil`.
  */
-export function honoOnError(options: HonoErrorsOptions) {
+export function watchOnError(options: WatchOnErrorOptions) {
 	const source = options.source ?? "api";
-	const reqIdHeader = options.requestIdHeader ?? "x-request-id";
+	const requestIdHeader = options.requestIdHeader ?? "x-request-id";
 
 	return (err: Error, c: Context): Response => {
-		const captureOpts: CaptureOptions = {
-			source,
-			route: c.req.path,
-			method: c.req.method,
-			requestId: c.req.header(reqIdHeader) ?? undefined,
-		};
-		const send = options.client.captureError(err, captureOpts);
-
-		// On Workers, hand the promise to the runtime so it survives the response.
-		const executionCtx = (
-			c as unknown as { executionCtx?: { waitUntil(p: Promise<unknown>): void } }
-		).executionCtx;
-		if (executionCtx?.waitUntil) {
-			executionCtx.waitUntil(send);
+		const isHttp = err instanceof HTTPException;
+		const status = isHttp ? err.status : 500;
+		if (status >= 500) {
+			try {
+				const client = typeof options.client === "function" ? options.client(c) : options.client;
+				const captureOptions: CaptureOptions = {
+					source,
+					route: c.req.routePath || c.req.path,
+					method: c.req.method,
+					statusCode: status,
+					requestId: c.req.header(requestIdHeader) ?? undefined,
+				};
+				waitUntil(c, client.captureError(err, captureOptions));
+			} catch {
+				// Reporting must never change the host's response.
+			}
 		}
-
+		if (isHttp) return err.getResponse();
 		return c.json({ error: { code: "INTERNAL", message: "Internal server error" } }, 500);
 	};
 }
 
-/**
- * Optional: middleware that sets a request id on `c` so downstream handlers
- * can read it. Only set if the request didn't already carry one.
- */
-export function ensureRequestId(headerName = "x-request-id"): MiddlewareHandler {
-	return async (c, next) => {
-		if (!c.req.header(headerName)) {
-			try {
-				c.req.raw.headers.set(headerName, crypto.randomUUID());
-			} catch {
-				// Request headers are immutable on some runtimes (Cloudflare
-				// Workers). Skip rather than fail the host's request.
-			}
-		}
-		await next();
-	};
+function waitUntil(c: Context, promise: Promise<unknown>) {
+	try {
+		// Throws outside Workers, where there's no execution context.
+		c.executionCtx.waitUntil(promise);
+	} catch {
+		// Node keeps running, so the send completes anyway.
+	}
 }

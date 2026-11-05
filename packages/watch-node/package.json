@@ -1,7 +1,7 @@
 {
 	"name": "@feedbakkr/watch-node",
-	"version": "0.3.0",
-	"description": "Server SDK (Node, Cloudflare Workers, Hono) for capturing errors to a Feedbakkr Watch collector.",
+	"version": "1.0.0",
+	"description": "Send server errors (Node, Cloudflare Workers, Hono) to FeedBakkr Watch.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -47,8 +47,8 @@
 	},
 	"devDependencies": {
 		"hono": "^4.13.13",
-		"tsup": "^8.5.1",
+		"tsup": "^9.0.0",
 		"typescript": "~6.0.3",
-		"vitest": "^4.1.11"
+		"vitest": "^5.1.0"
 	}
 }

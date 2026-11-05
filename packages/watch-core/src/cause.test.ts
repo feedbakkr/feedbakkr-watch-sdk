@@ -38,9 +38,7 @@ describe("walkCauses", () => {
 	});
 
 	test("breaks cycles instead of looping forever", () => {
-		// biome-ignore lint/suspicious/noExplicitAny: building a deliberate cycle for the test
 		const a: any = new Error("a");
-		// biome-ignore lint/suspicious/noExplicitAny: building a deliberate cycle for the test
 		const b: any = new Error("b", { cause: a });
 		a.cause = b;
 		const chain = walkCauses(a);

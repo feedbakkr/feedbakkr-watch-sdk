@@ -2,7 +2,7 @@
 	"name": "feedbakkr-watch-sdk",
 	"version": "0.0.0",
 	"private": true,
-	"description": "Browser + server SDKs for Feedbakkr Watch — error monitoring for Cloudflare Workers + D1.",
+	"description": "The SDKs for FeedBakkr Watch: free error tracking on your own Cloudflare account.",
 	"type": "module",
 	"scripts": {
 		"build": "pnpm -r build",
@@ -19,10 +19,10 @@
 		"security:scan:full": "pnpm run security:audit:moderate && pnpm run security:osv"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.15",
-		"tsup": "^8.5.1",
+		"@biomejs/biome": "^2.6.5",
+		"tsup": "^9.0.0",
 		"typescript": "~6.0.3",
-		"vitest": "^4.1.11"
+		"vitest": "^5.1.0"
 	},
 	"engines": {
 		"node": ">=22"

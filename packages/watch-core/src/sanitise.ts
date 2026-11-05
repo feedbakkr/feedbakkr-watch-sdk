@@ -51,11 +51,3 @@ function isSensitiveKey(key: string, options?: SanitiseOptions): boolean {
 	if (options?.additionalSensitiveKeys?.test(key)) return true;
 	return false;
 }
-
-export function safeJsonStringify(value: unknown): string {
-	try {
-		return JSON.stringify(value);
-	} catch {
-		return JSON.stringify({ __unserialisable: true });
-	}
-}
