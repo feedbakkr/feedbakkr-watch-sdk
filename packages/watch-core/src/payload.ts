@@ -1,10 +1,8 @@
 import { sanitise } from "./sanitise.js";
-import type { CaptureOptions, ErrorSeverity, EventPayload, SourceName, Tags } from "./types.js";
+import type { CaptureOptions, EventPayload, SourceName, Tags } from "./types.js";
 
 export interface PayloadBuilderConfig {
 	projectId: string;
-	projectName?: string;
-	tenantId?: string;
 	environment: string;
 	appVersion?: string;
 	defaultSource: SourceName;
@@ -27,14 +25,15 @@ export function buildPayload(
 		environment: config.environment,
 		appVersion: config.appVersion,
 		timestamp: new Date().toISOString(),
-		tenantId: config.tenantId,
 		projectId: config.projectId,
-		projectName: config.projectName,
 		errorName,
 		message,
 		stack,
 		fingerprint: options.fingerprint,
-		tags: options.tags ? sanitise({ ...config.defaultTags, ...options.tags }) : config.defaultTags,
+		tags:
+			config.defaultTags || options.tags
+				? sanitise({ ...config.defaultTags, ...options.tags })
+				: undefined,
 		context: options.context ? sanitise(options.context) : undefined,
 		request:
 			options.route || options.method || options.statusCode || options.requestId
@@ -48,8 +47,4 @@ export function buildPayload(
 	};
 
 	return payload;
-}
-
-export function severityForCapture(severity: ErrorSeverity | undefined): ErrorSeverity {
-	return severity ?? "error";
 }

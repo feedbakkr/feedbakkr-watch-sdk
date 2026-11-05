@@ -1,7 +1,7 @@
 {
 	"name": "@feedbakkr/watch-core",
-	"version": "0.3.0",
-	"description": "Shared error-monitoring primitives used by watch-web, watch-node, and watch-worker.",
+	"version": "1.0.0",
+	"description": "The event format, grouping and privacy rules shared by the FeedBakkr Watch SDKs and Watch itself.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -31,8 +31,8 @@
 		"test": "vitest run"
 	},
 	"devDependencies": {
-		"tsup": "^8.5.1",
+		"tsup": "^9.0.0",
 		"typescript": "~6.0.3",
-		"vitest": "^4.1.11"
+		"vitest": "^5.1.0"
 	}
 }

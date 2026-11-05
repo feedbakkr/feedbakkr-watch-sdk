@@ -70,14 +70,14 @@ jobs:
       # Pack every package with pnpm. `pnpm pack` rewrites the `workspace:^`
       # dependency specifiers to real version ranges; `npm publish` run in a
       # package directory does not, which shipped 0.2.3 of watch-web,
-      # watch-node and watch-ui with uninstallable `workspace:^` deps.
+      # watch-node with uninstallable `workspace:^` deps.
       # The step fails if any `workspace:` specifier survives, and logs each
       # tarball's file list as a last-line defence against shipping a stray
       # credential or build artefact.
       - name: Pack packages
         run: |
           mkdir -p "$RUNNER_TEMP/packs"
-          for pkg in watch-types watch-core watch-web watch-node watch-ui; do
+          for pkg in watch-core watch-web watch-node; do
             (cd "packages/$pkg" && pnpm pack --pack-destination "$RUNNER_TEMP/packs")
           done
           for tgz in "$RUNNER_TEMP"/packs/*.tgz; do
@@ -94,10 +94,10 @@ jobs:
       # flow. `--access public` is required for first-time publishes of
       # scoped packages. `--provenance` triggers the OIDC exchange + sigstore
       # attestation. No `env: NODE_AUTH_TOKEN` — OIDC handles auth.
-      # Dependencies first: types, core, then the packages that use them.
+      # Dependencies first: core, then the packages that use it.
       - name: Publish packages
         run: |
-          for pkg in watch-types watch-core watch-web watch-node watch-ui; do
+          for pkg in watch-core watch-web watch-node; do
             npm publish "$RUNNER_TEMP"/packs/feedbakkr-$pkg-*.tgz \
               --access public --provenance --tag ${{ github.event.inputs.tag }}
           done

@@ -36,29 +36,26 @@ export function buildFingerprintKey(inputs: FingerprintInputs): string {
 }
 
 /**
- * Compute the storage fingerprint for an event. If the payload carries an
- * explicit fingerprint string, it wins (after normalisation) — otherwise the
- * heuristic key is hashed via Web Crypto's SHA-256.
+ * Compute the storage fingerprint for an event: a hash of the caller's own
+ * `fingerprint` when there is one, otherwise of the heuristic key. Hashing the
+ * explicit value (rather than cutting it to length) keeps long names such as
+ * `checkout-payment-failed` and `checkout-payment-timeout` apart.
  */
 export async function computeFingerprint(payload: EventPayload): Promise<string> {
-	if (payload.fingerprint) {
-		const explicit = payload.fingerprint.trim().slice(0, FINGERPRINT_LENGTH);
-		if (explicit) return explicit;
-	}
-
-	const key = buildFingerprintKey({
-		projectId: payload.projectId,
-		environment: payload.environment,
-		source: payload.source,
-		errorName: payload.errorName,
-		message: payload.message,
-		stack: payload.stack,
-		route: payload.request?.route,
-		groupByUrl: payload.groupByUrl,
-	});
-
-	const data = new TextEncoder().encode(key);
-	const digest = await crypto.subtle.digest("SHA-256", data);
+	const explicit = payload.fingerprint?.trim();
+	const key = explicit
+		? `explicit|${explicit}`
+		: buildFingerprintKey({
+				projectId: payload.projectId,
+				environment: payload.environment,
+				source: payload.source,
+				errorName: payload.errorName,
+				message: payload.message,
+				stack: payload.stack,
+				route: payload.request?.route,
+				groupByUrl: payload.groupByUrl,
+			});
+	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
 	return bytesToHex(new Uint8Array(digest)).slice(0, FINGERPRINT_LENGTH);
 }
 

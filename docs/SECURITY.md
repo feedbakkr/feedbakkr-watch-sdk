@@ -1,63 +1,27 @@
 # Security
 
-`feedbakkr-watch-sdk` follows the [Feedbakkr org dependency-scanning
-policy][org-policy]. This is a publicly-published package monorepo — source
-visibility lets npm verify provenance attestations on every release.
+## Reporting a vulnerability
 
-[org-policy]: https://github.com/feedbakkr/feedbakkr/blob/main/docs/security-dependency-scanning.md
+Please report it privately through [GitHub's private vulnerability reporting](https://github.com/feedbakkr/feedbakkr-watch-sdk/security/advisories/new), not in a public issue. We'll reply within a few working days and keep you posted until it's fixed. Please give us a chance to release a fix before you talk about it publicly.
 
-## Workflows
+Security fixes go into the latest release.
 
-- **`ci.yml`** — lint + build + typecheck + test on every PR against `main`.
-- **`security-pr.yml`** — runs `pnpm audit --audit-level high` on every PR.
-  **Blocking.** Fails the PR if a high+ advisory is present.
-- **`security-scheduled.yml`** — nightly (04:00 UTC) + `workflow_dispatch`.
-  Runs `pnpm audit --audit-level moderate` plus OSV-Scanner. Reporting-only;
-  uploads the JSON OSV report as a 30-day artifact.
-- **`publish-packages.yml`** — manual dispatch. Bumps versions in each
-  publishable package's `package.json` are checked in beforehand. The
-  workflow runs the full pre-publish gate (typecheck → test → audit → build
-  → per-package `npm pack --dry-run`) then publishes all 5 packages with
-  `npm publish --provenance`.
+## What the SDKs send
 
-## Publishing auth — OIDC trusted publishing
+Only what's described in each package's README. Tags and context are redacted before sending; the SDKs never read cookies, request bodies, form values or auth headers. The browser SDK sends nothing beyond the error itself until the app turns on consent, and sends only over https unless `debug` is on.
 
-There is **no `NPM_TOKEN` secret** on this repo. Publishes use the
-[npm trusted publisher][trusted] flow: GitHub Actions mints an OIDC token,
-npm exchanges it for a short-lived publish token, the publish runs, and a
-provenance attestation gets signed and recorded in the public sigstore
-transparency log.
+## Checks
 
-[trusted]: https://docs.npmjs.com/trusted-publishers
+- **`ci.yml`**: lint, build, types and tests on every pull request.
+- **`security-pr.yml`**: `pnpm audit --audit-level high` on every pull request. It blocks the merge.
+- **`security-scheduled.yml`**: nightly `pnpm audit --audit-level moderate` and OSV-Scanner. It reports and doesn't block.
 
-Requirements maintained by this workflow:
+Locally: `pnpm run security:scan` (needs `osv-scanner`, e.g. `brew install osv-scanner`).
 
-- Job `permissions: id-token: write`
-- Node 24 on the runner (ships npm 11.x, which has the OIDC client)
-- No `registry-url` on `actions/setup-node` (it would write an `.npmrc`
-  forcing token auth before OIDC kicks in)
-- `--provenance` on every `npm publish`
-- Public repo (npm rejects provenance attestations from private sources)
+If an advisory can't be fixed (no patch yet, or it only affects development tools), add its GHSA id to `pnpm.auditConfig.ignoreGhsas` in `package.json` with the reason in the pull request.
 
-For each published package, the matching Trusted Publisher entry must exist
-on npmjs.com pointing at `feedbakkr/feedbakkr-watch-sdk` +
-`publish-packages.yml`.
+## Publishing
 
-## Local scans
+`publish-packages.yml` runs by hand once the versions are set. It checks types, tests, audits, builds and packs each package, then publishes with `npm publish --provenance`.
 
-```bash
-pnpm run security:audit            # high+ — mirrors the PR gate
-pnpm run security:audit:moderate   # moderate+ — mirrors the scheduled scan
-pnpm run security:scan             # audit + osv-scanner
-pnpm run security:scan:full        # audit:moderate + osv-scanner
-```
-
-Install osv-scanner locally (macOS): `brew install osv-scanner`.
-
-## Adding an exception
-
-If a high+ advisory genuinely can't be fixed (no upstream patch / dev-only /
-not exploitable in our usage), follow the org exception process documented
-in the [org policy][org-policy]. Add the GHSA to
-`pnpm.auditConfig.ignoreGhsas` in root `package.json` and document the
-reasoning in `docs/security-exceptions.md`.
+There's no npm token. The workflow uses [npm trusted publishing](https://docs.npmjs.com/trusted-publishers): GitHub Actions proves who it is to npm with a short-lived OIDC token, and each release gets a public provenance record linking it to the commit and workflow run that built it. Each package has a trusted publisher entry on npmjs.com for `feedbakkr/feedbakkr-watch-sdk` and `publish-packages.yml`.

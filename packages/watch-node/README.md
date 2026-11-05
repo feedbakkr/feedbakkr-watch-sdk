@@ -1,100 +1,87 @@
 # @feedbakkr/watch-node
 
-Server SDK for [Feedbakkr Watch](https://github.com/feedbakkr/feedbakkr-tools).
-Works in Node, Cloudflare Workers, and any Hono app. Sends asynchronously so
-capture never blocks a response.
+Send server errors to [FeedBakkr Watch](https://github.com/feedbakkr/feedbakkr-watch) from Node, Cloudflare Workers or any Hono app. Sending never delays a response.
 
-```bash
+```sh
 pnpm add @feedbakkr/watch-node
 ```
 
-Hono is an optional peer — only required if you import the `/hono` helper.
-
-## Plain Node
+## Node
 
 ```ts
-import { createFeedbakkrErrorsClient } from "@feedbakkr/watch-node";
+import { createWatchClient } from "@feedbakkr/watch-node";
 
-const errors = createFeedbakkrErrorsClient({
-	endpoint: process.env.FBK_ERRORS_ENDPOINT!,
-	apiKey: process.env.FBK_ERRORS_KEY,
-	projectId: "feedbakkr-api",
+const watch = createWatchClient({
+	endpoint: process.env.WATCH_ENDPOINT,
+	projectId: "my-api",
 	environment: process.env.NODE_ENV ?? "development",
-	appVersion: process.env.APP_VERSION,
+	ingestKey: process.env.WATCH_INGEST_KEY,
 });
 
 try {
 	await doThing();
-} catch (e) {
-	// Fire and forget: don't await in the request path.
-	void errors.captureError(e, { source: "api", route: "/widgets" });
-	throw e;
+} catch (error) {
+	void watch.captureError(error, { route: "/orders" });
+	throw error;
 }
 
-// Before a short-lived process exits:
-await errors.flush();
+// Before a short-lived script exits:
+await watch.flush();
 ```
 
-## Hono / Cloudflare Workers
+## Hono and Cloudflare Workers
+
+On Workers your settings arrive on `env` with each request. `getWatchClient` makes one client for the same settings and reuses it, so its limits work across requests.
 
 ```ts
 import { Hono } from "hono";
-import { createFeedbakkrErrorsClient } from "@feedbakkr/watch-node";
-import { honoOnError } from "@feedbakkr/watch-node/hono";
+import { getWatchClient } from "@feedbakkr/watch-node";
+import { watchOnError } from "@feedbakkr/watch-node/hono";
 
-const app = new Hono();
+const app = new Hono<{ Bindings: Env }>();
 
 app.onError(
-	honoOnError({
-		client: createFeedbakkrErrorsClient({
-			endpoint: env.FBK_ERRORS_ENDPOINT,
-			apiKey: env.FBK_ERRORS_KEY,
-			projectId: "feedbakkr-api",
-			environment: env.ENVIRONMENT,
-		}),
+	watchOnError({
+		client: (c) =>
+			getWatchClient({
+				endpoint: c.env.WATCH_ENDPOINT,
+				projectId: "my-api",
+				environment: c.env.ENVIRONMENT,
+				ingestKey: c.env.WATCH_INGEST_KEY,
+			}),
 	}),
 );
 ```
 
-`honoOnError` reads `c.executionCtx.waitUntil` when available, so on
-Workers the capture survives past the response without delaying it.
+`watchOnError`:
 
-Capturing from your own handler on Workers works the same way.
-`captureError` returns a promise that settles when the event has been sent,
-and it never rejects. Pass it to `waitUntil` rather than awaiting it:
+- reports unexpected errors and answers with a JSON 500;
+- leaves an `HTTPException` its own response, and reports it only if its status is 500 or more, so a 404 you throw on purpose isn't an error;
+- records the route pattern (`/orders/:id`), method, status and the `x-request-id` header;
+- passes the send to `executionCtx.waitUntil`, so it finishes after the response.
 
-```ts
-c.executionCtx.waitUntil(errors.captureError(err, { route: c.req.path }));
-```
+Outside Hono on Workers, do the same yourself: `ctx.waitUntil(watch.captureError(error))`. Don't `await` it in the request.
 
 ## Options
 
-| Option | Default | What it does |
-| --- | --- | --- |
-| `endpoint` | — | Worker `/v1/events` URL. |
-| `projectId` | — | Stable per-project identifier. |
-| `environment` | — | e.g. `production`, `dev`. |
-| `apiKey` | — | Sent as `x-feedbakkr-tool-key`. |
-| `enabled` | `true` | Set false in tests. Reporting is also off when `endpoint` or `projectId` is empty. |
-| `defaultSource` | `"api"` | Component name, any string (for example `api-cron`). Override per call if needed. |
-| `timeoutMs` | `5000` | Abandon a send after this long. |
-| `defaultTags` | — | Tags merged into every event. |
-| `maxQueueSize` | `64` | Backpressure cap; excess events drop silently. |
-| `beforeSend` | — | Drop or mutate before send. |
-| `fetchImpl` | global `fetch` | Inject when bundling for older Node. |
+| Option          | Default                             |                                                                                            |
+| --------------- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| `endpoint`      |                                     | Your Watch's `/v1/events` address                                                          |
+| `projectId`     |                                     | The app's id in Watch                                                                      |
+| `environment`   |                                     | e.g. `production`                                                                          |
+| `ingestKey`     |                                     | The app's ingest key                                                                       |
+| `appVersion`    |                                     | Shows which release an error came from                                                     |
+| `enabled`       | `true`                              | `false` turns it off, e.g. in tests. It's also off when `endpoint` or `projectId` is empty |
+| `limits`        | `{ perMinute: 60, repeatMs: 2000 }` | At most this many errors a minute, and the same error at most once in `repeatMs`           |
+| `defaultSource` | `api`                               | The component name, e.g. `api-cron`                                                        |
+| `defaultTags`   |                                     | Tags added to every error                                                                  |
+| `groupByUrl`    | `false`                             | Make the same error on different routes separate issues                                    |
+| `maxQueueSize`  | `64`                                | Errors waiting to send beyond this are dropped                                             |
+| `timeoutMs`     | `5000`                              | Give up on a send after this long                                                          |
+| `beforeSend`    |                                     | `(event) => event \| null`: change an event, or return null to drop it                     |
+| `fetchImpl`     | `fetch`                             | Use a different `fetch`                                                                    |
+| `debug`         | `false`                             | Log failed sends to the console                                                            |
 
-## Privacy by default
+## Safe by design
 
-Tags and context are sanitised before send — see
-[security-and-privacy.md](https://github.com/feedbakkr/feedbakkr-tools/blob/main/docs/security-and-privacy.md).
-The SDK never reads request bodies, cookies, or auth headers on its own.
-
-## Fail-safe
-
-`captureError` never throws into your route handler, and its promise never
-rejects. Network failures, error responses and timeouts are swallowed, so a
-flapping collector can't take down your API. There are no retries.
-
-## See also
-
-- [Full Node SDK docs](https://github.com/feedbakkr/feedbakkr-tools/blob/main/docs/node-sdk.md)
+`captureError` never throws, and its promise never rejects: it settles once the event is sent, refused or timed out. If Watch is down, events are dropped quietly; there are no retries. Tags and context are redacted before sending, and the SDK never reads request bodies, cookies or headers other than the request id.

@@ -1,98 +1,104 @@
 # @feedbakkr/watch-web
 
-Browser SDK for [Feedbakkr Watch](https://github.com/feedbakkr/feedbakkr-tools).
-Captures uncaught errors, unhandled rejections, and explicit captures, then
-forwards them to your self-hosted (or managed) collector.
+Send browser errors to [FeedBakkr Watch](https://github.com/feedbakkr/feedbakkr-watch). It catches uncaught errors and unhandled promise rejections on its own, and you can report others yourself.
 
-```bash
+```sh
 pnpm add @feedbakkr/watch-web
 ```
 
-## Initialise
+## Start it
 
-Call once at the top of your app entry — ideally before any other client
-code runs, so errors during boot are caught.
+Call `initWatch` once, as early as you can in your app's entry, so errors while the page loads are caught too.
 
 ```ts
-import { initFeedbakkrErrors } from "@feedbakkr/watch-web";
+import { initWatch } from "@feedbakkr/watch-web";
 
-initFeedbakkrErrors({
-	endpoint: "https://errors.example.com/v1/events",
-	projectId: "feedbakkr-web",
+initWatch({
+	endpoint: "https://feedbakkr-watch.you.workers.dev/v1/events",
+	projectId: "my-app",
 	environment: "production",
-	appVersion: "1.0.0",
-	apiKey: import.meta.env.VITE_FBK_ERRORS_KEY,
+	ingestKey: "wchi_…",
+	appVersion: "1.4.0",
 });
 ```
 
-## Capture explicitly
+An ingest key can only send errors for its app, so it's safe in browser code. In FeedBakkr you can limit it to your site's address.
+
+## Report an error yourself
 
 ```ts
 import { addBreadcrumb, captureError, captureMessage } from "@feedbakkr/watch-web";
 
-addBreadcrumb({ category: "ui", message: "Opened inbox" });
+addBreadcrumb({ category: "ui", message: "Opened checkout" });
 
 try {
-	await doRiskyThing();
-} catch (e) {
-	captureError(e, {
-		tags: { feature: "inbox" },
-		context: { workspaceId, projectId },
-	});
+	await placeOrder();
+} catch (error) {
+	captureError(error, { tags: { feature: "checkout" } });
 }
+
+captureMessage("Payment provider slow", { severity: "warning" });
 ```
 
-## React error boundary
-
-Available behind a subpath import so the bundle stays free of React if you
-don't need it:
+## React
 
 ```tsx
-import { FeedbakkrErrorBoundary } from "@feedbakkr/watch-web/react";
+import { WatchErrorBoundary } from "@feedbakkr/watch-web/react";
 
-<FeedbakkrErrorBoundary fallback={<ErrorScreen />}>
+<WatchErrorBoundary fallback={<p>Something went wrong.</p>}>
 	<App />
-</FeedbakkrErrorBoundary>;
+</WatchErrorBoundary>;
 ```
 
-Or use the HOC: `withErrorBoundary(Component, { fallback })`.
+`fallback` can also be `(error, reset) => …`. To wrap one component: `withWatchErrorBoundary(Component, { fallback })`. React is only needed if you import `/react`.
+
+## Consent
+
+By default only the error itself is sent: its message and stack, the page's path (without query or hash) and the browser. Two kinds of extra detail are off until you turn them on, for example after a cookie banner:
+
+```ts
+import { setConsent } from "@feedbakkr/watch-web";
+
+setConsent({ technical: true, behavioural: true });
+```
+
+- `technical`: screen and window size, connection, language, time zone.
+- `behavioural`: breadcrumbs, the last click or navigation, and the last few failed requests (address only, no query).
+
+You can also pass `consent` to `initWatch`.
 
 ## Options
 
-| Option | Default | What it does |
-| --- | --- | --- |
-| `endpoint` | — | Worker `/v1/events` URL. |
-| `projectId` | — | Stable identifier per project. |
-| `environment` | — | `production`, `staging`, etc. |
-| `appVersion` | — | Recommended; correlates errors to releases. |
-| `apiKey` | — | Sent as `x-feedbakkr-tool-key`. |
-| `enabled` | `true` | Set false to turn reporting off entirely (no listeners, no requests). Reporting is also off when `endpoint` or `projectId` is empty. |
-| `debug` | `false` | Logs internal failures via `console.debug`. |
-| `defaultSource` | `"web"` | Component name for events that don't set one, any string (for example `community-web`). |
-| `timeoutMs` | `5000` | Abandon a send after this long. |
-| `maxBreadcrumbs` | `30` | Cap on retained breadcrumbs. |
-| `sampleRate` | `1` | 0–1 fraction sent. |
-| `captureUnhandledErrors` | `true` | `window.error` listener. |
-| `captureUnhandledRejections` | `true` | `window.unhandledrejection` listener. |
-| `captureNavigation` | `false` | Auto-breadcrumb on history changes. |
-| `beforeSend` | — | `(event) => event \| null` filter/mutate. |
+| Option                       | Default                              |                                                                                     |
+| ---------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `endpoint`                   |                                      | Your Watch's `/v1/events` address. Must be https unless `debug` is on               |
+| `projectId`                  |                                      | The app's id in Watch                                                               |
+| `environment`                |                                      | e.g. `production`                                                                   |
+| `ingestKey`                  |                                      | The app's ingest key                                                                |
+| `appVersion`                 |                                      | Shows which release an error came from                                              |
+| `enabled`                    | `true`                               | `false` turns everything off. It's also off when `endpoint` or `projectId` is empty |
+| `limits`                     | `{ perMinute: 10, repeatMs: 30000 }` | At most this many errors a minute, and the same error at most once in `repeatMs`    |
+| `sampleRate`                 | `1`                                  | The share of errors to send, 0 to 1                                                 |
+| `defaultSource`              | `web`                                | The component name, e.g. `checkout-web`                                             |
+| `defaultTags`                |                                      | Tags added to every error                                                           |
+| `url`                        | the page's path                      | The page to report, as a string or a function                                       |
+| `groupByUrl`                 | `false`                              | Make the same error on different pages separate issues                              |
+| `captureUnhandledErrors`     | `true`                               | Report uncaught errors                                                              |
+| `captureUnhandledRejections` | `true`                               | Report unhandled promise rejections                                                 |
+| `captureNavigation`          | `false`                              | Add a breadcrumb on each navigation                                                 |
+| `maxBreadcrumbs`             | `30`                                 |                                                                                     |
+| `timeoutMs`                  | `5000`                               | Give up on a send after this long                                                   |
+| `consent`                    | both off                             | See above                                                                           |
+| `beforeSend`                 |                                      | `(event) => event \| null`: change an event, or return null to drop it              |
+| `debug`                      | `false`                              | Log what the SDK does to the console                                                |
 
-## Privacy by default
+## What it leaves out
 
-The SDK never reads cookies, request bodies, form values, or auth headers.
-Tags and context are sanitised — keys matching `authorization`, `cookie`,
-`password`, `token`, `api_key`, `email`, `session*`, etc. are replaced
-with `[REDACTED]` before send.
+- "Script error." reports, which come from other sites' scripts the browser won't show details for.
+- Errors from browser extensions.
+- Watch's own requests, from the failed-requests list.
+- Anything too big to send: large context and breadcrumbs are dropped first, then the stack and message are shortened.
 
-Full list and sanitisation rules:
-[security-and-privacy.md](https://github.com/feedbakkr/feedbakkr-tools/blob/main/docs/security-and-privacy.md).
+## Safe by design
 
-## Fail-safe
-
-Capture never throws into your app. Network failures, malformed responses,
-and `beforeSend` exceptions are all swallowed (and logged via `debug` when
-enabled).
-
-## See also
-
-- [Full web SDK docs](https://github.com/feedbakkr/feedbakkr-tools/blob/main/docs/web-sdk.md)
+Nothing the SDK does can throw into your app. If Watch is down or slow, events are dropped quietly. There are no retries.

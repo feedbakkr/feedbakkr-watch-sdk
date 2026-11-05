@@ -8,36 +8,49 @@ import {
 	DEFAULT_CONSENT,
 	type EventPayload,
 	type FetchHistoryEntry,
+	fitPayload,
 	type LastUserAction,
 	mergeConsent,
 	type SourceName,
 	type Tags,
+	Throttle,
+	type ThrottleOptions,
 	timeoutSignal,
 	type WebContext,
 	walkCauses,
 } from "@feedbakkr/watch-core";
 
-export interface InitOptions {
+export interface WatchOptions {
+	/** Your Watch's ingest URL, e.g. `https://feedbakkr-watch.you.workers.dev/v1/events`. */
 	endpoint: string;
+	/** The app's id in Watch. */
 	projectId: string;
-	projectName?: string;
-	tenantId?: string;
+	/** e.g. `production`. */
 	environment: string;
 	appVersion?: string;
-	apiKey?: string;
+	/** An ingest key (`wchi_…`) for this app. It can only send errors, so it's safe in a page. */
+	ingestKey?: string;
 	/**
 	 * Set false to turn reporting off entirely: no listeners, no requests.
 	 * Reporting is also off when `endpoint` or `projectId` is empty, so a
 	 * missing config never produces requests.
 	 */
 	enabled?: boolean;
+	/** Log what the SDK does with console.debug, and allow a plain-http endpoint. */
 	debug?: boolean;
 	/** Source (component) for events that don't set one. Default "web". */
 	defaultSource?: SourceName;
 	/** Abort a send after this many milliseconds. Default 5000. */
 	timeoutMs?: number;
 	maxBreadcrumbs?: number;
+	/** Send this share of errors, from 0 to 1. Default 1. */
 	sampleRate?: number;
+	/**
+	 * Limits on what one page sends, so an error in a loop or a render can't
+	 * use up the app's daily allowance. Default 10 a minute, and the same error
+	 * (name, message and page) at most once every 30 seconds.
+	 */
+	limits?: Partial<ThrottleOptions>;
 	defaultTags?: Tags;
 	captureUnhandledErrors?: boolean;
 	captureUnhandledRejections?: boolean;
@@ -61,44 +74,40 @@ export interface InitOptions {
 	 * so the same error at different pages becomes distinct groups.
 	 */
 	groupByUrl?: boolean;
+	/** Change or drop (return null) an event before it's sent. */
 	beforeSend?: (event: EventPayload) => EventPayload | null | Promise<EventPayload | null>;
 }
 
 const FETCH_HISTORY_MAX = 5;
+const DEFAULT_LIMITS: ThrottleOptions = { perMinute: 10, repeatMs: 30_000 };
+// Errors from browser extensions and other sites' scripts aren't the app's.
+const EXTENSION_URL = /(chrome|moz|safari|safari-web|ms-browser)-extension:\/\//;
 
 interface InternalState {
 	options: Required<
 		Omit<
-			InitOptions,
-			| "appVersion"
-			| "apiKey"
-			| "tenantId"
-			| "projectName"
-			| "defaultTags"
-			| "beforeSend"
-			| "consent"
-			| "url"
+			WatchOptions,
+			"appVersion" | "ingestKey" | "limits" | "defaultTags" | "beforeSend" | "consent" | "url"
 		>
 	> & {
 		appVersion?: string;
-		apiKey?: string;
-		tenantId?: string;
-		projectName?: string;
+		ingestKey?: string;
 		defaultTags?: Tags;
-		beforeSend?: InitOptions["beforeSend"];
-		url?: InitOptions["url"];
+		beforeSend?: WatchOptions["beforeSend"];
+		url?: WatchOptions["url"];
 	};
 	consent: ConsentSettings;
 	breadcrumbs: Breadcrumb[];
 	lastAction: LastUserAction | null;
 	fetchHistory: FetchHistoryEntry[];
+	throttle: Throttle;
 	queue: AsyncQueue<EventPayload>;
 }
 
 let state: InternalState | null = null;
 
 // Module-level guards so re-init (Vite HMR rerunning the app entry, or a
-// host that calls initFeedbakkrErrors more than once) doesn't stack
+// host that calls initWatch more than once) doesn't stack
 // listeners forever. Without these guards every save during dev would add
 // another fetch wrapper / click listener / unhandled-error handler — they
 // leak memory and the host process eventually gets SIGTERMed.
@@ -107,7 +116,7 @@ let fetchPatched = false;
 let historyPatched = false;
 let clicksHooked = false;
 
-export function initFeedbakkrErrors(options: InitOptions): void {
+export function initWatch(options: WatchOptions): void {
 	// Missing config or `enabled: false` turns reporting off quietly. Clearing
 	// `state` also silences listeners left installed by an earlier init.
 	if (!options.endpoint || !options.projectId || options.enabled === false) {
@@ -115,34 +124,29 @@ export function initFeedbakkrErrors(options: InitOptions): void {
 		return;
 	}
 
-	// Endpoint scheme guard. The endpoint is whatever the host passes — a
-	// misconfigured staging bundle hard-coded to `http://malicious.example`
-	// would silently exfiltrate every captured event (URLs, user agents,
-	// breadcrumbs) over plaintext. Reject anything that isn't `https://`
-	// unless the caller explicitly opted into `debug: true` (local dev).
-	if (typeof options.endpoint === "string" && options.endpoint.length > 0) {
-		try {
-			const url = new URL(options.endpoint);
-			if (url.protocol !== "https:" && !options.debug) {
-				console.warn(
-					"[feedbakkr-watch] endpoint is not https — refusing to initialise. Set debug:true to bypass for local development.",
-				);
-				return;
-			}
-		} catch {
-			console.warn("[feedbakkr-watch] endpoint is not a valid URL — refusing to initialise.");
+	// Events go over https only, so a misconfigured endpoint can't send page
+	// details in plain text. `debug: true` allows http for local development.
+	try {
+		const url = new URL(options.endpoint);
+		if (url.protocol !== "https:" && !options.debug) {
+			console.warn(
+				"[feedbakkr-watch] The endpoint isn't https, so Watch is off. Use debug: true for local development.",
+			);
+			state = null;
 			return;
 		}
+	} catch {
+		console.warn("[feedbakkr-watch] The endpoint isn't a valid URL, so Watch is off.");
+		state = null;
+		return;
 	}
 
 	const merged: InternalState["options"] = {
 		endpoint: options.endpoint,
 		projectId: options.projectId,
-		projectName: options.projectName,
-		tenantId: options.tenantId,
 		environment: options.environment,
 		appVersion: options.appVersion,
-		apiKey: options.apiKey,
+		ingestKey: options.ingestKey,
 		enabled: options.enabled ?? true,
 		debug: options.debug ?? false,
 		defaultSource: options.defaultSource ?? "web",
@@ -164,6 +168,7 @@ export function initFeedbakkrErrors(options: InitOptions): void {
 		breadcrumbs: [],
 		lastAction: null,
 		fetchHistory: [],
+		throttle: new Throttle({ ...DEFAULT_LIMITS, ...options.limits }),
 		queue: new AsyncQueue<EventPayload>(async (event) => {
 			await sendEvent(event, merged);
 		}),
@@ -179,12 +184,17 @@ export function initFeedbakkrErrors(options: InitOptions): void {
 		windowListenersInstalled = true;
 		window.addEventListener("error", (e) => {
 			if (!state?.options.captureUnhandledErrors) return;
-			const err = e.error instanceof Error ? e.error : new Error(e.message || "Unhandled error");
+			// "Script error." with no error object is a script from another site
+			// the browser won't show us; there's nothing to fix in the app.
+			if (!(e.error instanceof Error) && (!e.message || e.message === "Script error.")) return;
+			if (EXTENSION_URL.test(e.filename ?? "") || fromExtension(e.error)) return;
+			const err = e.error instanceof Error ? e.error : new Error(e.message);
 			safeCapture(err);
 		});
 		window.addEventListener("unhandledrejection", (e) => {
 			if (!state?.options.captureUnhandledRejections) return;
 			const reason = e.reason;
+			if (fromExtension(reason)) return;
 			const err =
 				reason instanceof Error
 					? reason
@@ -221,13 +231,18 @@ export function getConsent(): ConsentSettings {
 }
 
 export function captureError(error: Error | unknown, options: CaptureOptions = {}): void {
-	if (!state || !state.options.enabled) return;
-	const err = error instanceof Error ? error : new Error(String(error));
+	if (!state?.options.enabled) return;
+	let err: Error;
+	try {
+		err = error instanceof Error ? error : new Error(String(error));
+	} catch {
+		err = new Error("Unknown error");
+	}
 	safeCapture(err, options);
 }
 
 export function captureMessage(message: string, options: CaptureOptions = {}): void {
-	if (!state || !state.options.enabled) return;
+	if (!state?.options.enabled) return;
 	safeCapture(message, { severity: "info", ...options });
 }
 
@@ -267,8 +282,6 @@ function safeCapture(error: Error | string, options: CaptureOptions = {}): void 
 			error,
 			{
 				projectId: state.options.projectId,
-				projectName: state.options.projectName,
-				tenantId: state.options.tenantId,
 				environment: state.options.environment,
 				appVersion: state.options.appVersion,
 				defaultSource: state.options.defaultSource,
@@ -302,6 +315,7 @@ function safeCapture(error: Error | string, options: CaptureOptions = {}): void 
 			event.groupByUrl = true;
 		}
 
+		if (!state.throttle.allow(event)) return;
 		state.queue.enqueue(event);
 	} catch (caught) {
 		debug("captureError failed", caught);
@@ -318,22 +332,25 @@ async function sendEvent(event: EventPayload, options: InternalState["options"])
 			outgoing = event;
 		}
 	}
+	// keepalive requests (which outlive the page) are limited to 64 KB.
+	outgoing = outgoing && fitPayload(outgoing);
 	if (!outgoing) return;
 
 	const headers: Record<string, string> = {
 		"content-type": "application/json",
-		"x-feedbakkr-tool-source": "errors-web",
+		"x-feedbakkr-tool-source": "watch-web",
 	};
-	if (options.apiKey) headers["x-feedbakkr-tool-key"] = options.apiKey;
+	if (options.ingestKey) headers["x-feedbakkr-tool-key"] = options.ingestKey;
 
 	try {
-		await fetch(options.endpoint, {
+		const response = await fetch(options.endpoint, {
 			method: "POST",
 			headers,
 			body: JSON.stringify(outgoing),
 			keepalive: true,
 			signal: timeoutSignal(options.timeoutMs),
 		});
+		if (!response.ok) debug("Watch refused the event", response.status);
 	} catch (e) {
 		debug("send failed", e);
 	}
@@ -401,7 +418,7 @@ function collectWebContext(): WebContext | undefined {
  *   2. `window.location.pathname` as the auto-default in browsers.
  *   3. `undefined` when neither is available (SSR, tests).
  */
-function resolveCurrentUrl(source: InitOptions["url"]): string | undefined {
+function resolveCurrentUrl(source: WatchOptions["url"]): string | undefined {
 	try {
 		if (typeof source === "function") {
 			const v = source();
@@ -540,6 +557,8 @@ function hookFetch(): void {
 		const rawUrl =
 			typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 		const url = scrubUrl(rawUrl);
+		// Watch's own sends aren't part of what the app was doing.
+		if (state && url === scrubUrl(state.options.endpoint)) return original(input as Request, init);
 		try {
 			const res = await original(input as Request, init);
 			if (!res.ok && state) {
@@ -570,6 +589,12 @@ function hookFetch(): void {
 	}) as typeof fetch;
 }
 
+function fromExtension(value: unknown): boolean {
+	if (!(value instanceof Error) || !value.stack) return false;
+	const frames = value.stack.split("\n").filter((line) => line.includes("://"));
+	return frames.length > 0 && frames.every((line) => EXTENSION_URL.test(line));
+}
+
 function recordFetch(entry: FetchHistoryEntry): void {
 	if (!state) return;
 	state.fetchHistory.push(entry);
@@ -580,8 +605,7 @@ function recordFetch(entry: FetchHistoryEntry): void {
 
 function debug(...args: unknown[]): void {
 	if (state?.options.debug) {
-		// biome-ignore lint/suspicious/noConsole: debug-only path, gated on debug flag
-		console.debug("[feedbakkr-errors]", ...args);
+		console.debug("[feedbakkr-watch]", ...args);
 	}
 }
 
@@ -594,11 +618,12 @@ export function __resetForTests(): void {
 	clicksHooked = false;
 }
 
-// Re-export the cause-chain type so consumers don't have to dual-import
-// from watch-core just to type a beforeSend hook.
+// Re-exported so apps don't need watch-core just to type a beforeSend hook.
 export type {
+	CaptureOptions,
 	CauseChainEntry,
 	ConsentSettings,
+	EventPayload,
 	FetchHistoryEntry,
 	LastUserAction,
 	SourceName,
