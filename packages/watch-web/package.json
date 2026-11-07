@@ -46,7 +46,7 @@
 		"@feedbakkr/watch-core": "workspace:^"
 	},
 	"devDependencies": {
-		"@types/react": "~19.2.15",
+		"@types/react": "~19.3.0",
 		"happy-dom": "^21.0.4",
 		"react": "^19.3.0",
 		"tsup": "^9.0.0",
